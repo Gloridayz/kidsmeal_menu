@@ -2,7 +2,7 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { ExtractedDayMenu } from "@/lib/types";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 

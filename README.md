@@ -44,7 +44,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(public) 키 — 공개 조회용 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role 키 — 서버에서만 사용, 절대 노출 금지 |
 | `GEMINI_API_KEY` | Gemini API 키 |
-| `GEMINI_MODEL` | (선택) 사용할 모델, 기본값 `gemini-2.5-flash` |
+| `GEMINI_MODEL` | (선택) 사용할 모델, 기본값 `gemini-3.5-flash-lite` |
 | `ADMIN_PIN` | `/admin` 업로드 페이지 접근용 PIN |
 | `ADMIN_SESSION_SECRET` | 관리자 세션 쿠키 서명용 무작위 문자열 (`openssl rand -hex 32`로 생성 권장) |
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractMenuFromFile } from "@/lib/anthropic";
+import { extractMenuFromFile } from "@/lib/gemini";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB (Vercel 서버리스 함수 요청 본문 제한 참고)

@@ -88,7 +88,7 @@ export default function AdminUploadForm() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+          accept="image/png,image/jpeg,image/webp,image/heic,image/heif,application/pdf"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="mt-1.5 block w-full text-sm text-zinc-700 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-zinc-700 dark:text-zinc-300 dark:file:bg-zinc-50 dark:file:text-zinc-900"
         />

@@ -1,10 +1,10 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI, Type } from "@google/genai";
 import type { ExtractedDayMenu } from "@/lib/types";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
-const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
 function buildPrompt(year: number, month: number) {
   return `첨부된 파일은 어린이집(유치원)의 ${year}년 ${month}월 월간 식단표입니다.
@@ -15,30 +15,26 @@ function buildPrompt(year: number, month: number) {
 - 휴무일, 주말, 공휴일 등 식단이 없는 날은 결과에서 제외해줘.
 - 메뉴 항목이 여러 개면 쉼표(, )로 구분한 하나의 문자열로 합쳐줘.
 - 특정 항목(예: 오전간식)이 표에 없으면 해당 필드는 null로 해줘.
-- 표에 없는 날짜를 추측해서 만들어내지 마.
-- 오직 아래 JSON 스키마의 배열만 출력해. 설명, 마크다운 코드블록, 다른 텍스트를 절대 포함하지 마.
-
-[
-  { "day": 1, "lunch": "...", "morning_snack": "...", "afternoon_snack": "..." },
-  ...
-]`;
+- 표에 없는 날짜를 추측해서 만들어내지 마.`;
 }
 
-function extractJsonArray(text: string): unknown {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const candidate = fenced ? fenced[1] : trimmed;
-  const start = candidate.indexOf("[");
-  const end = candidate.lastIndexOf("]");
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error("Claude 응답에서 JSON 배열을 찾을 수 없습니다.");
-  }
-  return JSON.parse(candidate.slice(start, end + 1));
-}
+const RESPONSE_SCHEMA = {
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      day: { type: Type.INTEGER },
+      lunch: { type: Type.STRING, nullable: true },
+      morning_snack: { type: Type.STRING, nullable: true },
+      afternoon_snack: { type: Type.STRING, nullable: true },
+    },
+    required: ["day", "lunch", "morning_snack", "afternoon_snack"],
+  },
+};
 
 function validateDayMenus(data: unknown, daysInMonth: number): ExtractedDayMenu[] {
   if (!Array.isArray(data)) {
-    throw new Error("Claude 응답 형식이 올바르지 않습니다 (배열이 아님).");
+    throw new Error("Gemini 응답 형식이 올바르지 않습니다 (배열이 아님).");
   }
   const result: ExtractedDayMenu[] = [];
   for (const item of data) {
@@ -70,11 +66,11 @@ export async function extractMenuFromFile(params: {
 }): Promise<ExtractedDayMenu[]> {
   const { fileBuffer, mimeType, year, month } = params;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY 환경변수가 설정되어 있지 않습니다.");
+    throw new Error("GEMINI_API_KEY 환경변수가 설정되어 있지 않습니다.");
   }
-  const client = new Anthropic({ apiKey });
+  const client = new GoogleGenAI({ apiKey });
 
   const base64Data = fileBuffer.toString("base64");
   const isPdf = mimeType === "application/pdf";
@@ -86,36 +82,34 @@ export async function extractMenuFromFile(params: {
 
   const daysInMonth = new Date(year, month, 0).getDate();
 
-  const fileBlock = isPdf
-    ? ({
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: base64Data },
-      } as const)
-    : ({
-        type: "image",
-        source: {
-          type: "base64",
-          media_type: mimeType as "image/jpeg" | "image/png" | "image/webp" | "image/gif",
-          data: base64Data,
-        },
-      } as const);
-
-  const message = await client.messages.create({
+  const response = await client.models.generateContent({
     model: MODEL,
-    max_tokens: 4096,
-    messages: [
+    contents: [
       {
         role: "user",
-        content: [fileBlock, { type: "text", text: buildPrompt(year, month) }],
+        parts: [
+          { inlineData: { mimeType, data: base64Data } },
+          { text: buildPrompt(year, month) },
+        ],
       },
     ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
   });
 
-  const textBlock = message.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("Claude 응답에서 텍스트를 찾을 수 없습니다.");
+  const text = response.text;
+  if (!text) {
+    throw new Error("Gemini 응답에서 텍스트를 찾을 수 없습니다.");
   }
 
-  const parsed = extractJsonArray(textBlock.text);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Gemini 응답을 JSON으로 파싱하지 못했습니다.");
+  }
+
   return validateDayMenus(parsed, daysInMonth);
 }

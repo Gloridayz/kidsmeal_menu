@@ -1,10 +1,10 @@
 # 어린이집 식단표 관리 앱
 
-한 달에 한 번 식단표(사진/PDF)를 업로드하면 Claude API가 날짜별 메뉴(점심/오전간식/오후간식)를 자동으로 인식해 Supabase에 저장합니다. 저장된 식단은 로그인 없이 공유 링크로 누구나 일간/주간/월간 캘린더로 조회할 수 있고, 홈 화면에 앱처럼 추가할 수 있는 PWA로 동작합니다.
+한 달에 한 번 식단표(사진/PDF)를 업로드하면 Google Gemini API가 날짜별 메뉴(점심/오전간식/오후간식)를 자동으로 인식해 Supabase에 저장합니다. 저장된 식단은 로그인 없이 공유 링크로 누구나 일간/주간/월간 캘린더로 조회할 수 있고, 홈 화면에 앱처럼 추가할 수 있는 PWA로 동작합니다.
 
 ## 기능
 
-- **관리자 업로드 (`/admin`)**: PIN으로 보호. 식단표 이미지 또는 PDF와 연/월을 입력하면 Claude가 즉시 인식해 확인 절차 없이 Supabase에 저장합니다.
+- **관리자 업로드 (`/admin`)**: PIN으로 보호. 식단표 이미지 또는 PDF와 연/월을 입력하면 Gemini가 즉시 인식해 확인 절차 없이 Supabase에 저장합니다.
 - **공개 조회 (`/`)**: 로그인 없이 접근 가능한 캘린더. 일간/주간/월간 뷰 전환.
 - **PWA**: 홈 화면에 아이콘 추가, 오프라인에서도 마지막으로 본 화면 셸 표시.
 
@@ -12,7 +12,7 @@
 
 - Next.js 16 (App Router, TypeScript, Tailwind CSS v4)
 - Supabase (Postgres + RLS) — 데이터 저장
-- Anthropic Claude API (`@anthropic-ai/sdk`) — 식단표 이미지/PDF 인식
+- Google Gemini API (`@google/genai`) — 식단표 이미지/PDF 인식
 - `jose` — 관리자 세션 쿠키 서명(JWT)
 
 ## 1. Supabase 설정
@@ -26,9 +26,9 @@
    - `anon public` 키 → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` 키 → `SUPABASE_SERVICE_ROLE_KEY` (절대 클라이언트에 노출하지 마세요)
 
-## 2. Anthropic API 키 발급
+## 2. Gemini API 키 발급
 
-[console.anthropic.com](https://console.anthropic.com) 에서 API 키를 발급받아 `ANTHROPIC_API_KEY`로 설정합니다.
+[Google AI Studio](https://aistudio.google.com/apikey) 에서 API 키를 발급받아 `GEMINI_API_KEY`로 설정합니다.
 
 ## 3. 환경변수 설정
 
@@ -43,8 +43,8 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(public) 키 — 공개 조회용 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role 키 — 서버에서만 사용, 절대 노출 금지 |
-| `ANTHROPIC_API_KEY` | Claude API 키 |
-| `ANTHROPIC_MODEL` | (선택) 사용할 모델, 기본값 `claude-sonnet-5` |
+| `GEMINI_API_KEY` | Gemini API 키 |
+| `GEMINI_MODEL` | (선택) 사용할 모델, 기본값 `gemini-2.5-flash` |
 | `ADMIN_PIN` | `/admin` 업로드 페이지 접근용 PIN |
 | `ADMIN_SESSION_SECRET` | 관리자 세션 쿠키 서명용 무작위 문자열 (`openssl rand -hex 32`로 생성 권장) |
 
@@ -69,7 +69,7 @@ npm run dev
 
 1. `/admin`에서 PIN으로 로그인합니다.
 2. 연도/월을 선택하고 식단표 사진 또는 PDF를 업로드합니다.
-3. Claude가 날짜별 점심/오전간식/오후간식을 자동 인식해 즉시 Supabase에 저장합니다(별도 확인 절차 없음).
+3. Gemini가 날짜별 점심/오전간식/오후간식을 자동 인식해 즉시 Supabase에 저장합니다(별도 확인 절차 없음).
 4. 저장이 끝나면 저장된 날짜 목록이 화면에 표시됩니다.
 5. `/`(홈)에서 누구나 로그인 없이 일간/주간/월간 뷰로 식단을 확인할 수 있습니다. 이 URL을 학부모들에게 공유하면 됩니다.
 6. 모바일 브라우저에서 "홈 화면에 추가"를 하면 앱처럼 아이콘이 생성됩니다(PWA).
@@ -77,8 +77,8 @@ npm run dev
 ## 폴더 구조 참고
 
 - `supabase/schema.sql` — DB 스키마 및 RLS 정책
-- `src/lib/anthropic.ts` — Claude API로 식단표 인식하는 로직
-- `src/lib/auth.ts`, `src/middleware.ts` — 관리자 PIN 인증 및 세션 보호
-- `src/app/api/admin/upload/route.ts` — 업로드 → Claude 인식 → Supabase 저장 API
+- `src/lib/gemini.ts` — Gemini API로 식단표 인식하는 로직
+- `src/lib/auth.ts`, `src/proxy.ts` — 관리자 PIN 인증 및 세션 보호
+- `src/app/api/admin/upload/route.ts` — 업로드 → Gemini 인식 → Supabase 저장 API
 - `src/components/calendar/` — 일간/주간/월간 캘린더 UI
 - `public/manifest.json`, `public/sw.js` — PWA 설정

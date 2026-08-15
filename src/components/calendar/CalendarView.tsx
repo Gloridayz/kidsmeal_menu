@@ -51,7 +51,7 @@ function getHeaderLabel(viewMode: ViewMode, anchor: Date): string {
 }
 
 export default function CalendarView() {
-  const [viewMode, setViewMode] = useState<ViewMode>("month");
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [anchor, setAnchor] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [menus, setMenus] = useState<Menu[]>([]);

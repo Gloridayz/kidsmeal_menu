@@ -56,24 +56,28 @@ export default function CalendarView() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [menus, setMenus] = useState<Menu[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [loadedRangeKey, setLoadedRangeKey] = useState<string | null>(null);
+  const [loadedFetchKey, setLoadedFetchKey] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const { start, end } = useMemo(() => getRange(viewMode, anchor), [viewMode, anchor]);
   const fetchStart = viewMode === "month" ? startOfMonth(anchor) : start;
   const fetchEnd = viewMode === "month" ? endOfMonth(anchor) : end;
   const rangeKey = `${toDateKey(fetchStart)}_${toDateKey(fetchEnd)}`;
-  const loading = loadedRangeKey !== rangeKey;
+  const fetchKey = `${rangeKey}#${reloadToken}`;
+  const loading = loadedFetchKey !== fetchKey;
 
   useEffect(() => {
     let cancelled = false;
     const [rangeStart, rangeEnd] = rangeKey.split("_");
-    supabase
-      .from("menus")
-      .select("*")
-      .gte("date", rangeStart)
-      .lte("date", rangeEnd)
-      .order("date", { ascending: true })
-      .then(({ data, error }) => {
+
+    async function load() {
+      try {
+        const { data, error } = await supabase
+          .from("menus")
+          .select("*")
+          .gte("date", rangeStart)
+          .lte("date", rangeEnd)
+          .order("date", { ascending: true });
         if (cancelled) return;
         if (error) {
           setError("식단 정보를 불러오지 못했습니다.");
@@ -81,12 +85,19 @@ export default function CalendarView() {
           setMenus(data ?? []);
           setError(null);
         }
-        setLoadedRangeKey(rangeKey);
-      });
+      } catch {
+        if (cancelled) return;
+        setError("식단 정보를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.");
+      } finally {
+        if (!cancelled) setLoadedFetchKey(fetchKey);
+      }
+    }
+
+    load();
     return () => {
       cancelled = true;
     };
-  }, [rangeKey]);
+  }, [fetchKey, rangeKey]);
 
   const menusByDate = useMemo(() => {
     const map = new Map<string, Menu>();
@@ -170,7 +181,17 @@ export default function CalendarView() {
       {loading && (
         <p className="text-sm text-zinc-400 dark:text-zinc-500">불러오는 중...</p>
       )}
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <button
+            onClick={() => setReloadToken((t) => t + 1)}
+            className="text-sm font-medium text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-50"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
 
       {!loading && !error && (
         <>
